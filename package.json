@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mysten/sui.js": "^0.54.1",
+    "esbuild": "^0.25.8",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
