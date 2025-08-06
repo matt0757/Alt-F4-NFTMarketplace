@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { useWallets, useConnectWallet, useCurrentWallet, useCurrentAccount } from '@mysten/dapp-kit';
+import { useConnectWallet, useDisconnectWallet, useCurrentAccount, useWallets } from '@mysten/dapp-kit';
+import { isEnokiWallet, type EnokiWallet, AuthProvider as EnokiAuthProvider } from '@mysten/enoki';
 
 interface User {
   id: string;
   email: string;
   name: string;
   picture?: string;
-  address?: string;
+  address: string;
 }
 
 interface AuthContextType {
@@ -23,52 +24,48 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<any[]>([]);
-
-  const wallets = useWallets();
-  const { mutate: connectWallet } = useConnectWallet();
-  const { currentWallet, isConnected } = useCurrentWallet();
+  
+  // Use Enoki hooks
   const currentAccount = useCurrentAccount();
+  const { mutate: connect } = useConnectWallet();
+  const { mutate: disconnect } = useDisconnectWallet();
+  const wallets = useWallets().filter(isEnokiWallet);
+  
+  const walletsByProvider = wallets.reduce(
+    (map, wallet) => map.set(wallet.provider, wallet),
+    new Map<EnokiAuthProvider, EnokiWallet>(),
+  );
+
+  // Convert currentAccount to User format
+  const user: User | null = currentAccount ? {
+    id: currentAccount.address,
+    email: 'user@example.com',
+    name: 'Enoki User',
+    address: currentAccount.address,
+  } : null;
 
   const login = async (provider: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Find the Enoki wallet for the specified provider
-      const enokiWallet = wallets.find(wallet => 
-        wallet.name.toLowerCase().includes(provider.toLowerCase())
-      );
+      console.log('🔍 Available wallets:', wallets.map(w => w.provider));
+      console.log('🔍 Wallets by provider:', Array.from(walletsByProvider.keys()));
       
-      if (!enokiWallet) {
-        throw new Error(`${provider} wallet not found`);
+      if (wallets.length === 0) {
+        throw new Error('No Enoki wallets available. Make sure VITE_GOOGLE_CLIENT_ID is set in your .env file and Enoki wallets are registered.');
       }
-
-      // Connect to the Enoki wallet
-      connectWallet(
-        { wallet: enokiWallet },
-        {
-          onSuccess: () => {
-            console.log('✅ Wallet connected successfully');
-            // Set user with the actual wallet address
-            if (currentAccount) {
-              setUser({
-                id: currentAccount.address,
-                email: 'user@example.com', // You might get this from the OAuth response
-                name: 'User', // You might get this from the OAuth response
-                address: currentAccount.address,
-              });
-            }
-          },
-          onError: (error) => {
-            console.error('❌ Wallet connection failed:', error);
-            setError('Failed to connect wallet');
-          },
-        }
-      );
+      
+      const wallet = walletsByProvider.get(provider as EnokiAuthProvider);
+      if (!wallet) {
+        throw new Error(`No wallet found for provider: ${provider}. Available: ${Array.from(walletsByProvider.keys()).join(', ')}`);
+      }
+      
+      connect({ wallet });
+      
     } catch (err) {
       console.error('Login failed:', err);
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -77,28 +74,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Update user when account changes
-  React.useEffect(() => {
-    if (currentAccount && isConnected) {
-      setUser({
-        id: currentAccount.address,
-        email: 'user@example.com',
-        name: 'User',
-        address: currentAccount.address,
-      });
-    } else {
-      setUser(null);
-    }
-  }, [currentAccount, isConnected]);
-
   const logout = () => {
-    setUser(null);
-    setError(null);
-    // The wallet disconnection is handled by the WalletProvider
+    try {
+      // Disconnect the current wallet
+      disconnect();
+      
+      // Clear any local state
+      setError(null);
+      setCredentials([]);
+      
+      console.log('✅ User logged out successfully');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setError('Logout failed');
+    }
   };
 
   const addCredential = (credential: any) => {
-    setCredentials(prev => [...prev, credential]);
+    const newCredential = {
+      ...credential,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
+    setCredentials(prev => [...prev, newCredential]);
   };
 
   const removeCredential = (id: string) => {
