@@ -1,48 +1,26 @@
 import React, { useEffect } from 'react';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './hooks/useAuth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createNetworkConfig,
+  SuiClientProvider,
+  WalletProvider,
+} from '@mysten/dapp-kit';
+import { getFullnodeUrl } from '@mysten/sui/client';
+import { AuthProvider, useAuth } from './contexts/AuthContext'; // Import useAuth from AuthContext
 import LoginScreen from './components/LoginScreen';
-import Dashboard from './components/Dashboard'; // Import Dashboard instead of LandingPage
-import { zkLoginService } from './services/zkLoginService';
+import Dashboard from './components/Dashboard';
+import { RegisterEnokiWallets } from './components/RegisterEnokiWallets';
+
+// Create a QueryClient instance
+const queryClient = new QueryClient();
+
+const { networkConfig } = createNetworkConfig({
+  testnet: { url: getFullnodeUrl('testnet') },
+  mainnet: { url: getFullnodeUrl('mainnet') },
+});
 
 function AppContent() {
   const { user, loading, error, login, logout, credentials, addCredential, removeCredential } = useAuth();
-
-  useEffect(() => {
-    // Check if we're returning from OAuth callback
-    const checkCallback = async () => {
-      console.log('=== CALLBACK DEBUG START ===');
-      console.log('Checking callback, current hash:', window.location.hash);
-      console.log('Hash includes id_token:', window.location.hash.includes('id_token'));
-      
-      if (window.location.hash.includes('id_token')) {
-        console.log('Processing OAuth callback...');
-        try {
-          console.log('Calling zkLoginService.handleCallback()...');
-          const callbackUser = await zkLoginService.handleCallback();
-          console.log('Callback user result:', callbackUser);
-          console.log('Type of callbackUser:', typeof callbackUser);
-          console.log('Is callbackUser truthy?', !!callbackUser);
-          
-          if (callbackUser) {
-            console.log('Calling login with user:', callbackUser);
-            const loginResult = await login(callbackUser);
-            console.log('Login function result:', loginResult);
-            console.log('Login completed, clearing hash...');
-            // Clear the URL hash to prevent re-processing
-            window.history.replaceState(null, '', window.location.pathname);
-          } else {
-            console.log('❌ No user returned from handleCallback');
-          }
-        } catch (err) {
-          console.error('❌ Callback error:', err);
-        }
-      }
-      console.log('=== CALLBACK DEBUG END ===');
-    };
-
-    checkCallback();
-  }, [login]);
 
   useEffect(() => {
     console.log('🔍 Auth state changed:');
@@ -81,9 +59,16 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+        <RegisterEnokiWallets />
+        <WalletProvider autoConnect>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
   );
 }
 

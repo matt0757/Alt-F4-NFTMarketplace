@@ -1,84 +1,130 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { zkLoginService } from '../services/zkLoginService';
-import { User } from '../types';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useWallets, useConnectWallet, useCurrentWallet, useCurrentAccount } from '@mysten/dapp-kit';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  address?: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
+  loading: boolean;
+  error: string | null;
   login: (provider: string) => Promise<void>;
   logout: () => void;
+  credentials: any[];
+  addCredential: (credential: any) => void;
+  removeCredential: (id: string) => void;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<any[]>([]);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Check if we're returning from OAuth callback
-        if (window.location.hash.includes('id_token')) {
-          const authenticatedUser = await zkLoginService.handleCallback();
-          if (authenticatedUser) {
-            setUser(authenticatedUser);
-            localStorage.setItem('zklogin_user', JSON.stringify(authenticatedUser));
-          }
-        } else {
-          // Check for stored user
-          const storedUser = localStorage.getItem('zklogin_user');
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const wallets = useWallets();
+  const { mutate: connectWallet } = useConnectWallet();
+  const { currentWallet, isConnected } = useCurrentWallet();
+  const currentAccount = useCurrentAccount();
 
-    checkAuth();
-  }, []);
-
-  const login = async (providerOrUser: string | User) => {
+  const login = async (provider: string) => {
     try {
-      setIsLoading(true);
-      // If it's already a user object (from callback), just set it
-      if (typeof providerOrUser === 'object' && providerOrUser.address) {
-        setUser(providerOrUser);
-        return;
+      setLoading(true);
+      setError(null);
+      
+      // Find the Enoki wallet for the specified provider
+      const enokiWallet = wallets.find(wallet => 
+        wallet.name.toLowerCase().includes(provider.toLowerCase())
+      );
+      
+      if (!enokiWallet) {
+        throw new Error(`${provider} wallet not found`);
       }
 
-      // If it's a string (provider name), do the authentication
-      if (typeof providerOrUser === 'string') {
-        const user = await zkLoginService.authenticate(providerOrUser);
-        setUser(user);
-      }
+      // Connect to the Enoki wallet
+      connectWallet(
+        { wallet: enokiWallet },
+        {
+          onSuccess: () => {
+            console.log('✅ Wallet connected successfully');
+            // Set user with the actual wallet address
+            if (currentAccount) {
+              setUser({
+                id: currentAccount.address,
+                email: 'user@example.com', // You might get this from the OAuth response
+                name: 'User', // You might get this from the OAuth response
+                address: currentAccount.address,
+              });
+            }
+          },
+          onError: (error) => {
+            console.error('❌ Wallet connection failed:', error);
+            setError('Failed to connect wallet');
+          },
+        }
+      );
     } catch (err) {
       console.error('Login failed:', err);
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  // Update user when account changes
+  React.useEffect(() => {
+    if (currentAccount && isConnected) {
+      setUser({
+        id: currentAccount.address,
+        email: 'user@example.com',
+        name: 'User',
+        address: currentAccount.address,
+      });
+    } else {
+      setUser(null);
+    }
+  }, [currentAccount, isConnected]);
+
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('zklogin_user');
+    setError(null);
+    // The wallet disconnection is handled by the WalletProvider
+  };
+
+  const addCredential = (credential: any) => {
+    setCredentials(prev => [...prev, credential]);
+  };
+
+  const removeCredential = (id: string) => {
+    setCredentials(prev => prev.filter(cred => cred.id !== id));
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      error,
+      login,
+      logout,
+      credentials,
+      addCredential,
+      removeCredential,
+    }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

@@ -36,7 +36,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const truncateAddress = (address: string) => {
+  const truncateAddress = (address: string | undefined) => {
+    if (!address) return 'No address';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 

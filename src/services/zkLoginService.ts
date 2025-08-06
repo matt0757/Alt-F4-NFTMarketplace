@@ -1,168 +1,165 @@
-import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { EnokiFlow } from '@mysten/enoki';
 import { SuiClient } from '@mysten/sui.js/client';
 import { User } from '../types';
 
-const REDIRECT_URI = window.location.origin;
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const ENOKI_API_KEY = import.meta.env.VITE_ENOKI_API_KEY;
 const SUI_NETWORK = import.meta.env.VITE_SUI_NETWORK || 'testnet';
 
 class ZkLoginService {
+  private enokiFlow: EnokiFlow;
   private suiClient: SuiClient;
-  private ephemeralKeyPair: Ed25519Keypair | null = null;
 
   constructor() {
-    const rpcUrl = SUI_NETWORK === 'mainnet' 
-      ? 'https://fullnode.mainnet.sui.io'
-      : 'https://fullnode.testnet.sui.io';
+    console.log('🔑 API Key:', ENOKI_API_KEY);
+    console.log('🌐 Network:', SUI_NETWORK);
+    
+    if (!ENOKI_API_KEY) {
+      throw new Error('Enoki API key not configured. Please set VITE_ENOKI_API_KEY in your .env file.');
+    }
+
+    // Initialize Enoki Flow
+    this.enokiFlow = new EnokiFlow({
+      apiKey: ENOKI_API_KEY,
+      network: SUI_NETWORK as 'testnet' | 'mainnet' | 'devnet',
+    });
+
+    // Initialize Sui Client
+    const rpcUrl = (() => {
+      switch (SUI_NETWORK) {
+        case 'mainnet':
+          return 'https://fullnode.mainnet.sui.io';
+        case 'testnet':
+          return 'https://fullnode.testnet.sui.io';
+        case 'devnet':
+          return 'https://fullnode.devnet.sui.io';
+        default:
+          return 'https://fullnode.testnet.sui.io'; // Changed from devnet to testnet
+      }
+    })();
     
     this.suiClient = new SuiClient({ url: rpcUrl });
   }
 
   async authenticate(provider: string): Promise<User> {
     try {
-      if (!CLIENT_ID) {
-        throw new Error('Google Client ID not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.');
-      }
-
-      // Generate ephemeral key pair
-      this.ephemeralKeyPair = new Ed25519Keypair();
+      console.log('🚀 Starting Enoki authentication for provider:', provider);
       
-      // Generate randomness
-      const randomness = this.generateRandomness();
-      
-      // Get the ephemeral public key as a base64 string
-      const ephemeralPublicKeyBase64 = this.ephemeralKeyPair.getPublicKey().toBase64();
+      // Create authorization URL using Enoki
+      const authUrl = await this.enokiFlow.createAuthorizationURL({
+        provider: provider as 'google' | 'facebook' | 'twitch',
+        clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        redirectUrl: window.location.origin,
+        extraParams: {
+          scope: 'openid email profile',
+        },
+      });
 
-      // Generate nonce - simplified version without zkLogin SDK
-      const nonce = this.generateNonce(ephemeralPublicKeyBase64, randomness);
-
-      // Store session data
-      const privateKeyBase64 = btoa(String.fromCharCode(...this.ephemeralKeyPair.export().privateKey));
-      sessionStorage.setItem('zklogin_ephemeral_key', privateKeyBase64);
-      sessionStorage.setItem('zklogin_randomness', randomness);
-      sessionStorage.setItem('zklogin_nonce', nonce);
+      console.log('🔗 Auth URL created:', authUrl);
 
       // Redirect to OAuth provider
-      const authUrl = this.getAuthUrl(provider, nonce);
       window.location.href = authUrl;
 
-      // This will never be reached due to redirect, but TypeScript needs a return
+      // This will never be reached due to redirect
       return {} as User;
     } catch (error) {
-      console.error('Authentication error:', error);
+      console.error('❌ Authentication error:', error);
       throw error;
     }
   }
 
-  private generateRandomness(): string {
-    // Generate a random string for the zkLogin flow
-    const array = new Uint8Array(16);
-    crypto.getRandomValues(array);
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  private generateNonce(publicKey: string, randomness: string): string {
-    // Simplified nonce generation without zkLogin SDK
-    // In production, this would use the actual zkLogin nonce generation
-    const data = `${publicKey}_${randomness}_${Date.now()}`;
-    return btoa(data).replace(/[+/=]/g, '').substring(0, 21);
-  }
-
-  private getAuthUrl(provider: string, nonce: string): string {
-    const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: 'id_token',
-      scope: 'openid email profile',
-      nonce: nonce,
-    });
-
-    if (provider === 'google') {
-      return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-    }
-
-    throw new Error(`Unsupported provider: ${provider}`);
-  }
-
   async handleCallback(): Promise<User | null> {
     try {
-      // Extract ID token from URL fragment
+      console.log('🔄 Handling Enoki callback...');
+      
+      // Get authorization parameters from URL
+      const urlParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
+      const code = urlParams.get('code');
       const idToken = hashParams.get('id_token');
+      const state = urlParams.get('state') || hashParams.get('state');
 
-      if (!idToken) {
+      console.log('📋 Callback params:', { 
+        hasCode: !!code, 
+        hasIdToken: !!idToken, 
+        hasState: !!state 
+      });
+
+      if (!code && !idToken) {
+        console.log('❌ No authorization code or ID token found');
         return null;
       }
 
-      // Retrieve stored session data
-      const ephemeralKeyStr = sessionStorage.getItem('zklogin_ephemeral_key');
-      const randomness = sessionStorage.getItem('zklogin_randomness');
+      // Handle the auth callback with Enoki
+      const result = await this.enokiFlow.handleAuthCallback({
+        authorizationCode: code || undefined,
+        idToken: idToken || undefined,
+      });
 
-      if (!ephemeralKeyStr || !randomness) {
-        throw new Error('Missing session data');
-      }
+      console.log('✅ Enoki callback result:', result);
 
-      // Reconstruct ephemeral key pair from base64 string
-      const secretKey = Uint8Array.from(atob(ephemeralKeyStr), c => c.charCodeAt(0)).slice(0, 32); // Truncate to 32 bytes
-      this.ephemeralKeyPair = Ed25519Keypair.fromSecretKey(secretKey);
+      // Extract user information
+      const user: User = {
+        address: result.address,
+        provider: result.provider || 'google',
+        email: result.claims?.email || '',
+        name: result.claims?.name || result.claims?.given_name || 'Unknown User',
+      };
 
-      // Parse JWT to get user info
-      const jwtPayload = this.parseJwt(idToken);
-      
-      // For now, use a placeholder address since full zkLogin proof generation
-      // requires additional backend infrastructure
-      const address = `0x${this.generateDeterministicAddress(jwtPayload.sub)}`;
-
-      // Clear URL fragment
+      // Clear URL parameters
       window.history.replaceState(null, '', window.location.pathname);
 
-      // Clear session storage
-      sessionStorage.removeItem('zklogin_ephemeral_key');
-      sessionStorage.removeItem('zklogin_randomness');
-      sessionStorage.removeItem('zklogin_nonce');
+      console.log('👤 User created:', user);
+      return user;
 
-      return {
-        address,
-        provider: 'google',
-        email: jwtPayload.email,
-        name: jwtPayload.name,
-      };
     } catch (error) {
-      console.error('Callback handling error:', error);
+      console.error('❌ Callback handling error:', error);
       return null;
     }
   }
 
-  private parseJwt(token: string): any {
+  // Get current Enoki session
+  async getCurrentSession() {
     try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
-      return JSON.parse(jsonPayload);
+      const session = await this.enokiFlow.getSession();
+      console.log('📱 Current session:', session);
+      return session;
     } catch (error) {
-      console.error('Failed to parse JWT:', error);
-      return {};
+      console.error('❌ Failed to get session:', error);
+      return null;
     }
   }
 
-  private generateDeterministicAddress(sub: string): string {
-    // Generate a deterministic address from the Google sub claim
-    // This is a simplified version - in production, you'd use the actual zkLogin address derivation
-    let hash = 0;
-    for (let i = 0; i < sub.length; i++) {
-      const char = sub.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+  // Sign out from Enoki
+  async signOut() {
+    try {
+      await this.enokiFlow.logout();
+      console.log('👋 Signed out successfully');
+    } catch (error) {
+      console.error('❌ Sign out error:', error);
+      throw error;
     }
-    
-    // Convert to hex and pad to 64 characters (32 bytes)
-    const hexHash = Math.abs(hash).toString(16);
-    return hexHash.padStart(64, '0');
+  }
+
+  // Execute transaction using Enoki (for future credential operations)
+  async executeTransaction(transactionData: any) {
+    try {
+      const session = await this.getCurrentSession();
+      if (!session) {
+        throw new Error('No active session for transaction');
+      }
+
+      // Use Enoki to sponsor and execute transaction
+      const result = await this.enokiFlow.sponsorAndExecuteTransactionBlock({
+        transactionBlock: transactionData,
+      });
+
+      console.log('📝 Transaction executed:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Transaction error:', error);
+      throw error;
+    }
   }
 }
 
