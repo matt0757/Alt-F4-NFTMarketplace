@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import LoginScreen from './components/LoginScreen';
-import Dashboard from './components/Dashboard';
+import Dashboard from './components/Dashboard'; // Import Dashboard instead of LandingPage
 import { zkLoginService } from './services/zkLoginService';
 
 function AppContent() {
@@ -11,22 +11,48 @@ function AppContent() {
   useEffect(() => {
     // Check if we're returning from OAuth callback
     const checkCallback = async () => {
+      console.log('=== CALLBACK DEBUG START ===');
+      console.log('Checking callback, current hash:', window.location.hash);
+      console.log('Hash includes id_token:', window.location.hash.includes('id_token'));
+      
       if (window.location.hash.includes('id_token')) {
+        console.log('Processing OAuth callback...');
         try {
+          console.log('Calling zkLoginService.handleCallback()...');
           const callbackUser = await zkLoginService.handleCallback();
+          console.log('Callback user result:', callbackUser);
+          console.log('Type of callbackUser:', typeof callbackUser);
+          console.log('Is callbackUser truthy?', !!callbackUser);
+          
           if (callbackUser) {
-            // Update the auth context with the user data
-            // This would normally be handled by the login function
-            window.location.reload(); // Simple reload to update state
+            console.log('Calling login with user:', callbackUser);
+            const loginResult = await login(callbackUser);
+            console.log('Login function result:', loginResult);
+            console.log('Login completed, clearing hash...');
+            // Clear the URL hash to prevent re-processing
+            window.history.replaceState(null, '', window.location.pathname);
+          } else {
+            console.log('❌ No user returned from handleCallback');
           }
         } catch (err) {
-          console.error('Callback error:', err);
+          console.error('❌ Callback error:', err);
         }
       }
+      console.log('=== CALLBACK DEBUG END ===');
     };
 
     checkCallback();
-  }, []);
+  }, [login]);
+
+  useEffect(() => {
+    console.log('🔍 Auth state changed:');
+    console.log('  - User:', user);
+    console.log('  - Loading:', loading);
+    console.log('  - Error:', error);
+    console.log('  - User exists?', !!user);
+  }, [user, loading, error]);
+
+  console.log('🎯 RENDER: Showing', user ? 'Dashboard' : 'LoginScreen');
 
   if (loading) {
     return (

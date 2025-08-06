@@ -50,12 +50,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = async (provider: string) => {
+  const login = async (providerOrUser: string | User) => {
     try {
-      await zkLoginService.authenticate(provider);
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+      setIsLoading(true);
+      // If it's already a user object (from callback), just set it
+      if (typeof providerOrUser === 'object' && providerOrUser.address) {
+        setUser(providerOrUser);
+        return;
+      }
+
+      // If it's a string (provider name), do the authentication
+      if (typeof providerOrUser === 'string') {
+        const user = await zkLoginService.authenticate(providerOrUser);
+        setUser(user);
+      }
+    } catch (err) {
+      console.error('Login failed:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 

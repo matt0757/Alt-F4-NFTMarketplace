@@ -103,7 +103,7 @@ class ZkLoginService {
       }
 
       // Reconstruct ephemeral key pair from base64 string
-      const secretKey = Uint8Array.from(atob(ephemeralKeyStr), c => c.charCodeAt(0));
+      const secretKey = Uint8Array.from(atob(ephemeralKeyStr), c => c.charCodeAt(0)).slice(0, 32); // Truncate to 32 bytes
       this.ephemeralKeyPair = Ed25519Keypair.fromSecretKey(secretKey);
 
       // Parse JWT to get user info
