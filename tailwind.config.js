@@ -8,6 +8,7 @@ export default {
     extend: {
       animation: {
         'pulse': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'float': 'float linear infinite',
       },
       keyframes: {
         pulse: {
@@ -16,6 +17,14 @@ export default {
           },
           '50%': {
             opacity: '0.2',
+          },
+        },
+        float: {
+          from: {
+            transform: 'translateY(100vh) translateX(0)',
+          },
+          to: {
+            transform: 'translateY(-100vh) translateX(100px)',
           },
         },
       },

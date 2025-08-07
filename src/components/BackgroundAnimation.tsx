@@ -21,27 +21,16 @@ const BackgroundAnimation: React.FC = () => {
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-blue-400 rounded-full opacity-50"
+            className="absolute w-1 h-1 bg-blue-400 rounded-full opacity-50 animate-float"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animation: `float ${10 + Math.random() * 20}s linear infinite`,
+              animationDuration: `${10 + Math.random() * 20}s`,
               animationDelay: `${Math.random() * 10}s`,
             }}
           />
         ))}
       </div>
-      
-      <style jsx>{`
-        @keyframes float {
-          from {
-            transform: translateY(100vh) translateX(0);
-          }
-          to {
-            transform: translateY(-100vh) translateX(100px);
-          }
-        }
-      `}</style>
     </div>
   );
 };
