@@ -1,5 +1,5 @@
 import { EnokiFlow } from '@mysten/enoki';
-import { SuiClient } from '@mysten/sui.js/client';
+import { SuiClient } from '@mysten/sui/client';
 import { User } from '../types';
 
 const ENOKI_API_KEY = import.meta.env.VITE_ENOKI_API_KEY;

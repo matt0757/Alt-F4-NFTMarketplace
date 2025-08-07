@@ -9,6 +9,7 @@ import { getFullnodeUrl } from '@mysten/sui/client';
 import { AuthProvider, useAuth } from './contexts/AuthContext'; // Import useAuth from AuthContext
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
+import BackgroundAnimation from './components/BackgroundAnimation';
 import { RegisterEnokiWallets } from './components/RegisterEnokiWallets';
 
 // Create a QueryClient instance
@@ -34,25 +35,29 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen relative flex items-center justify-center">
+        <BackgroundAnimation />
+        <div className="text-white text-xl relative z-10">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      {user ? (
-        <Dashboard 
-          user={user} 
-          credentials={credentials}
-          onLogout={logout}
-          onAddCredential={addCredential}
-          onRemoveCredential={removeCredential}
-        />
-      ) : (
-        <LoginScreen onLogin={login} error={error} />
-      )}
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+      <BackgroundAnimation />
+      <div className="relative z-10 w-full flex items-center justify-center">
+        {user ? (
+          <Dashboard 
+            user={user} 
+            credentials={credentials}
+            onLogout={logout}
+            onAddCredential={addCredential}
+            onRemoveCredential={removeCredential}
+          />
+        ) : (
+          <LoginScreen onLogin={login} error={error} />
+        )}
+      </div>
     </div>
   );
 }
