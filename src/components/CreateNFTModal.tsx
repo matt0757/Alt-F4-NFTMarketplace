@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, Loader } from 'lucide-react';
+import { X, Upload, Loader, CheckCircle } from 'lucide-react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 
 interface CreateNFTModalProps {
@@ -11,6 +11,7 @@ const CreateNFTModal: React.FC<CreateNFTModalProps> = ({ onClose }) => {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   
   const { mintNFT } = useMarketplace();
 
@@ -20,14 +21,34 @@ const CreateNFTModal: React.FC<CreateNFTModalProps> = ({ onClose }) => {
 
     try {
       setIsLoading(true);
+      console.log('🎨 Creating NFT with data:', { name, description, imageUrl });
+      
       await mintNFT(name, description, imageUrl);
-      onClose();
+      
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+      
     } catch (error) {
       console.error('Failed to mint NFT:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="glass-dark rounded-xl p-8 w-full max-w-md text-center">
+          <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">NFT Created Successfully!</h2>
+          <p className="text-gray-400 mb-4">Your NFT has been minted and will appear in your collection shortly.</p>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -77,7 +98,7 @@ const CreateNFTModal: React.FC<CreateNFTModalProps> = ({ onClose }) => {
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Use services like Imgur, IPFS, or any direct image URL
+              Use a direct link to an image (jpg, png, gif, webp)
             </p>
           </div>
 
@@ -109,7 +130,10 @@ const CreateNFTModal: React.FC<CreateNFTModalProps> = ({ onClose }) => {
               className="flex-1 glass-button disabled:opacity-50 disabled:cursor-not-allowed py-2 px-4 rounded-lg transition-colors flex items-center justify-center"
             >
               {isLoading ? (
-                <Loader className="w-4 h-4 animate-spin" />
+                <>
+                  <Loader className="w-4 h-4 animate-spin mr-2" />
+                  Creating...
+                </>
               ) : (
                 'Create NFT'
               )}
