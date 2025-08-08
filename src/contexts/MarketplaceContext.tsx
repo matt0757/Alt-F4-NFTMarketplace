@@ -23,6 +23,8 @@ interface MarketplaceContextType {
   listItem: (itemId: string, price: number) => Promise<void>;
   purchaseItem: (itemId: string, price: number) => Promise<void>;
   mintNFT: (name: string, description: string, imageUrl: string) => Promise<void>;
+  testTransaction: () => Promise<any>;
+  requestTestnetSui: () => Promise<boolean>;
 }
 
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined);
@@ -61,6 +63,11 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
       const nfts = await marketplaceService.getUserNFTs(currentAccount.address);
       setUserNFTs(nfts);
       console.log('✅ User NFTs refreshed:', nfts);
+
+      // Also refresh user listed NFTs
+      const listedNFTs = await marketplaceService.getUserListedNFTs(currentAccount.address);
+      setUserListedNFTs(listedNFTs);
+      console.log('✅ User listed NFTs refreshed:', listedNFTs);
     } catch (err) {
       console.error('❌ Error refreshing user NFTs:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch user NFTs');
@@ -242,6 +249,30 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
     }
   }, [currentAccount, signAndExecute, refreshUserNFTs]);
 
+  const testTransaction = useCallback(async () => {
+    if (!currentAccount) throw new Error('No account connected');
+    
+    const wrappedExecute = async (tx: any) => {
+      return new Promise((resolve, reject) => {
+        signAndExecute(
+          { transaction: tx },
+          {
+            onSuccess: resolve,
+            onError: reject,
+          }
+        );
+      });
+    };
+    
+    return await marketplaceService.testTransaction(wrappedExecute);
+  }, [currentAccount, signAndExecute, marketplaceService]);
+
+  const requestTestnetSui = useCallback(async () => {
+    if (!currentAccount) throw new Error('No account connected');
+    
+    return await marketplaceService.requestTestnetSui(currentAccount.address);
+  }, [currentAccount, marketplaceService]);
+
   // Only refresh when account changes (not on every render)
   useEffect(() => {
     let mounted = true;
@@ -276,6 +307,8 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
       listItem,
       purchaseItem,
       mintNFT,
+      testTransaction,
+      requestTestnetSui,
     }}>
       {children}
     </MarketplaceContext.Provider>

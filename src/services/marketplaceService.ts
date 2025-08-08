@@ -79,23 +79,35 @@ export class MarketplaceService {
 
       console.log('📦 Raw owned objects:', ownedObjects);
 
+      // Get current marketplace listings to filter out listed items
+      const currentListings = await this.getListings();
+      const listedItemIds = new Set(currentListings.map(listing => listing.itemId));
+      console.log('🏪 Currently listed items:', Array.from(listedItemIds));
+
       const nfts: NFTObject[] = [];
 
       for (const obj of ownedObjects.data) {
         if (obj.data?.content && 'fields' in obj.data.content) {
           const fields = obj.data.content.fields as any;
+          const objectId = obj.data.objectId;
+          
+          // Skip if this NFT is currently listed in the marketplace
+          if (listedItemIds.has(objectId)) {
+            console.log('⚠️ Skipping listed NFT:', objectId);
+            continue;
+          }
           
           // Try to extract NFT data from different possible field structures
           const nft: NFTObject = {
-            objectId: obj.data.objectId,
-            name: fields.name || fields.title || `NFT #${obj.data.objectId.slice(0, 8)}`,
+            objectId,
+            name: fields.name || fields.title || `NFT #${objectId.slice(0, 8)}`,
             description: fields.description || fields.desc || 'No description',
             imageUrl: fields.image_url || fields.imageUrl || fields.url || '',
             owner: userAddress,
           };
           
           nfts.push(nft);
-          console.log('✅ Parsed NFT:', nft);
+          console.log('✅ Parsed owned NFT:', nft);
         }
       }
 
@@ -103,9 +115,17 @@ export class MarketplaceService {
       for (const obj of ownedObjects.data) {
         if (obj.data?.display?.data) {
           const display = obj.data.display.data;
+          const objectId = obj.data.objectId;
+          
+          // Skip if this NFT is currently listed in the marketplace
+          if (listedItemIds.has(objectId)) {
+            console.log('⚠️ Skipping listed NFT (display):', objectId);
+            continue;
+          }
+          
           const nft: NFTObject = {
-            objectId: obj.data.objectId,
-            name: display.name || `NFT #${obj.data.objectId.slice(0, 8)}`,
+            objectId,
+            name: display.name || `NFT #${objectId.slice(0, 8)}`,
             description: display.description || 'No description',
             imageUrl: display.image_url || display.link || '',
             owner: userAddress,
@@ -114,7 +134,7 @@ export class MarketplaceService {
           // Check if we already added this NFT
           if (!nfts.find(n => n.objectId === nft.objectId)) {
             nfts.push(nft);
-            console.log('✅ Parsed NFT from display:', nft);
+            console.log('✅ Parsed owned NFT from display:', nft);
           }
         }
       }
@@ -146,6 +166,37 @@ export class MarketplaceService {
     });
 
     return await signAndExecute(tx);
+  }
+
+  // Get NFTs that the user has listed for sale
+  async getUserListedNFTs(userAddress: string): Promise<NFTObject[]> {
+    try {
+      console.log('🔍 Fetching listed NFTs for user:', userAddress);
+      
+      // Get all marketplace listings
+      const allListings = await this.getListings();
+      
+      // Filter to only include listings by this user
+      const userListings = allListings.filter(listing => listing.seller === userAddress);
+      console.log('🏪 User listings found:', userListings.length);
+      
+      // Convert listings to NFTObject format
+      const listedNFTs: NFTObject[] = userListings.map(listing => ({
+        objectId: listing.itemId,
+        name: (listing as any).name || `NFT #${listing.itemId.slice(0, 8)}`,
+        description: (listing as any).description || 'No description',
+        imageUrl: (listing as any).imageUrl || '',
+        owner: userAddress,
+        isListed: true,
+        price: listing.price / 1e9, // Convert from MIST to SUI
+      }));
+      
+      console.log('🎯 User listed NFTs:', listedNFTs);
+      return listedNFTs;
+    } catch (error) {
+      console.error('❌ Error fetching user listed NFTs:', error);
+      return [];
+    }
   }
 
   async purchaseItem(
