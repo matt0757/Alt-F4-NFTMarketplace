@@ -136,9 +136,9 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
         console.log('✅ NFT moved to listed NFTs');
       }
       
-      // TEMPORARILY DISABLED: Refresh listings to show it in the marketplace
-      // await refreshListings();
-      console.log('⚠️ Listings refresh disabled for debugging');
+      // Refresh listings to show it in the marketplace
+      await refreshListings();
+      console.log('✅ Listings refreshed');
       
       console.log('✅ NFT listing completed!');
     } catch (err) {

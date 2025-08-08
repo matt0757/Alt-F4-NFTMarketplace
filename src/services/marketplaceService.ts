@@ -155,14 +155,14 @@ export class MarketplaceService {
   ) {
     const tx = new Transaction();
     
+    // Use the new wrap_and_list_nft function that handles the MarketplaceItem wrapping
     tx.moveCall({
-      target: `${MARKETPLACE_CONFIG.PACKAGE_ID}::marketplace::list_item`,
+      target: `${MARKETPLACE_CONFIG.PACKAGE_ID}::marketplace::wrap_and_list_nft`,
       arguments: [
         tx.object(MARKETPLACE_CONFIG.MARKETPLACE_ID),
         tx.object(itemObjectId),
         tx.pure.u64(price * 1e9), // Convert SUI to MIST
       ],
-      typeArguments: [`${MARKETPLACE_CONFIG.PACKAGE_ID}::nft::NFT`],
     });
 
     return await signAndExecute(tx);

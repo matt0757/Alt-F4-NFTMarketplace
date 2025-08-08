@@ -7,6 +7,7 @@ module sui_marketplace::marketplace {
     use sui::table::{Self, Table};
     use sui::event;
     use sui::balance::{Self, Balance};
+    use sui::dynamic_object_field as dof;
 
     // =================== Error Constants ===================
     
@@ -41,6 +42,11 @@ module sui_marketplace::marketplace {
     /// Admin capability
     public struct AdminCap has key {
         id: UID,
+    }
+
+    /// Key for storing items in dynamic object fields
+    public struct ItemKey has copy, drop, store {
+        id: ID,
     }
 
     // =================== Events ===================
@@ -91,8 +97,22 @@ module sui_marketplace::marketplace {
         }
     }
 
+    /// Convert an NFT to a MarketplaceItem for listing
+    public entry fun wrap_and_list_nft(
+        marketplace: &mut Marketplace,
+        nft: sui_marketplace::nft::NFT,
+        price: u64,
+        ctx: &mut TxContext
+    ) {
+        // Wrap the NFT in a MarketplaceItem
+        let marketplace_item = create_item(nft, ctx);
+        
+        // List the wrapped item
+        list_item(marketplace, marketplace_item, price, ctx);
+    }
+
     /// List an item for sale
-    public entry fun list_item<T: store>(
+    public entry fun list_item<T: key + store>(
         marketplace: &mut Marketplace,
         item: MarketplaceItem<T>,
         price: u64,
@@ -115,12 +135,13 @@ module sui_marketplace::marketplace {
             price,
         });
 
-        // Transfer item to marketplace for safekeeping
-        transfer::public_transfer(item, marketplace.admin);
+        // Store item in marketplace using dynamic object field
+        let item_key = ItemKey { id: item_id };
+        dof::add(&mut marketplace.id, item_key, item);
     }
 
     /// Purchase an item
-    public entry fun purchase_item<T: store>(
+    public entry fun purchase_item<T: key + store>(
         marketplace: &mut Marketplace,
         item_id: ID,
         payment: Coin<SUI>,
@@ -155,19 +176,25 @@ module sui_marketplace::marketplace {
         let fee_coin = coin::from_balance(fee_balance, ctx);
         transfer::public_transfer(fee_coin, marketplace.admin);
 
+        // Retrieve and transfer item to buyer
+        let item_key = ItemKey { id: item_id };
+        let item: MarketplaceItem<T> = dof::remove(&mut marketplace.id, item_key);
+        
+        // Unwrap the item and transfer to buyer
+        let MarketplaceItem { id, inner } = item;
+        object::delete(id);
+        transfer::public_transfer(inner, buyer);
+
         event::emit(ItemSold {
             item_id,
             seller,
             buyer,
             price,
         });
-
-        // Note: Item transfer would need to be handled separately
-        // as we need the actual item object
     }
 
     /// Cancel a listing
-    public entry fun cancel_listing(
+    public entry fun cancel_listing<T: key + store>(
         marketplace: &mut Marketplace,
         item_id: ID,
         ctx: &mut TxContext
@@ -178,6 +205,15 @@ module sui_marketplace::marketplace {
         assert!(listing.seller == tx_context::sender(ctx), E_NOT_SELLER);
         
         listing.is_active = false;
+
+        // Return item to seller
+        let item_key = ItemKey { id: item_id };
+        let item: MarketplaceItem<T> = dof::remove(&mut marketplace.id, item_key);
+        
+        // Unwrap the item and return to seller
+        let MarketplaceItem { id, inner } = item;
+        object::delete(id);
+        transfer::public_transfer(inner, listing.seller);
 
         event::emit(ListingCancelled {
             item_id,
