@@ -417,24 +417,6 @@ export class MarketplaceService {
     }
   }
 
-  // Test function to verify transaction system works
-  async testTransaction(signAndExecute: (tx: Transaction) => Promise<any>) {
-    try {
-      console.log('🧪 Testing basic transaction...');
-      const tx = new Transaction();
-      
-      // Simple SUI transfer to self (should always work)
-      tx.transferObjects([tx.gas], tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'));
-      
-      const result = await signAndExecute(tx);
-      console.log('✅ Test transaction result:', result);
-      return result;
-    } catch (error) {
-      console.error('❌ Test transaction failed:', error);
-      throw error;
-    }
-  }
-
   // Get NFT details from transaction effects
   async getNFTFromTransaction(txDigest: string): Promise<NFTObject | null> {
     try {

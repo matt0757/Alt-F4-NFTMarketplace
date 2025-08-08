@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Copy } from 'lucide-react';
+import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, Copy } from 'lucide-react';
 import CreateNFTModal from './CreateNFTModal';
 import ListNFTModal from './ListNFTModal';
 import { MarketplaceService } from '../services/marketplaceService';
@@ -16,8 +16,7 @@ const MarketplaceDashboard: React.FC = () => {
     error, 
     refreshListings, 
     refreshUserNFTs, 
-    purchaseItem,
-    testTransaction
+    purchaseItem
   } = useMarketplace();
   
   const currentAccount = useCurrentAccount();
@@ -28,7 +27,6 @@ const MarketplaceDashboard: React.FC = () => {
   const [showListModal, setShowListModal] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'my-nfts'>('marketplace');
-  const [testLoading, setTestLoading] = useState(false);
   
   // Use ref to track if initial load has happened
   const initialLoadRef = useRef(false);
@@ -71,30 +69,6 @@ const MarketplaceDashboard: React.FC = () => {
     await Promise.all([refreshListings(), refreshUserNFTs()]);
   };
 
-  const handleTestTransaction = async () => {
-    try {
-      setTestLoading(true);
-      console.log('🧪 Testing transaction system...');
-      const wrappedExecute = async (tx: any) => {
-        return new Promise((resolve, reject) => {
-          signAndExecute(
-            { transaction: tx },
-            {
-              onSuccess: resolve,
-              onError: reject,
-            }
-          );
-        });
-      };
-      await marketplaceService.testTransaction(wrappedExecute);
-      console.log('✅ Transaction system is working!');
-    } catch (error) {
-      console.error('❌ Transaction test failed:', error);
-    } finally {
-      setTestLoading(false);
-    }
-  };
-
   const copyAddressToClipboard = () => {
     if (currentAccount?.address) {
       navigator.clipboard.writeText(currentAccount.address);
@@ -118,14 +92,6 @@ const MarketplaceDashboard: React.FC = () => {
               title="Copy wallet address"
             >
               <Copy className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleTestTransaction}
-              disabled={testLoading}
-              className="glass-button p-3 rounded-lg hover:bg-green-500/20 transition-colors disabled:opacity-50"
-              title="Test transaction system"
-            >
-              <TestTube className={`w-5 h-5 ${testLoading ? 'animate-pulse' : ''}`} />
             </button>
             <button
               onClick={handleRefresh}
