@@ -14,12 +14,13 @@ import MarketplaceDashboard from './components/MarketplaceDashboard';
 import BackgroundAnimation from './components/BackgroundAnimation';
 import { RegisterEnokiWallets } from './components/RegisterEnokiWallets';
 import { LogOut, User as UserIcon } from 'lucide-react';
+import { SUI_CLIENT_CONFIG } from './config/constants';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient();
 
 const { networkConfig } = createNetworkConfig({
-  testnet: { url: getFullnodeUrl('testnet') },
+  testnet: { url: SUI_CLIENT_CONFIG.url },
   mainnet: { url: getFullnodeUrl('mainnet') },
 });
 

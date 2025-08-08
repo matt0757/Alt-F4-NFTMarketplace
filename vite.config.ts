@@ -7,4 +7,14 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    proxy: {
+      '/api/sui': {
+        target: 'https://fullnode.testnet.sui.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sui/, ''),
+        secure: true,
+      },
+    },
+  },
 })

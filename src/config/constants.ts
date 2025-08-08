@@ -12,5 +12,5 @@ export const ENOKI_CONFIG = {
 };
 
 export const SUI_CLIENT_CONFIG = {
-  url: "https://fullnode.testnet.sui.io:443"
+  url: import.meta.env.DEV ? "/api/sui" : "https://fullnode.testnet.sui.io:443"
 };

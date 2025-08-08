@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
-import { useCurrentAccount } from '@mysten/dapp-kit';
-import { ShoppingCart, Tag, Plus, Package, User, RefreshCw } from 'lucide-react';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Coins } from 'lucide-react';
 import CreateNFTModal from './CreateNFTModal';
 import ListNFTModal from './ListNFTModal';
+import { MarketplaceService } from '../services/marketplaceService';
+import { useSuiClient } from '@mysten/dapp-kit';
 
 const MarketplaceDashboard: React.FC = () => {
   const { 
@@ -13,18 +15,24 @@ const MarketplaceDashboard: React.FC = () => {
     error, 
     refreshListings, 
     refreshUserNFTs, 
-    purchaseItem 
+    purchaseItem,
+    testTransaction,
+    requestTestnetSui
   } = useMarketplace();
   
   const currentAccount = useCurrentAccount();
+  const client = useSuiClient();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'my-nfts'>('marketplace');
+  const [testLoading, setTestLoading] = useState(false);
   
   // Use ref to track if initial load has happened
   const initialLoadRef = useRef(false);
+  const marketplaceService = new MarketplaceService(client);
 
   // Only do initial load once when component mounts
   useEffect(() => {
@@ -63,6 +71,59 @@ const MarketplaceDashboard: React.FC = () => {
     await Promise.all([refreshListings(), refreshUserNFTs()]);
   };
 
+  const handleTestTransaction = async () => {
+    try {
+      setTestLoading(true);
+      console.log('🧪 Testing transaction system...');
+      const wrappedExecute = async (tx: any) => {
+        return new Promise((resolve, reject) => {
+          signAndExecute(
+            { transaction: tx },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            }
+          );
+        });
+      };
+      await marketplaceService.testTransaction(wrappedExecute);
+      console.log('✅ Transaction system is working!');
+    } catch (error) {
+      console.error('❌ Transaction test failed:', error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleRequestTestnetSui = async () => {
+    try {
+      const success = await requestTestnetSui();
+      if (success) {
+        alert('✅ Testnet SUI requested! Please wait a moment and try again.');
+      } else {
+        alert('❌ Failed to request testnet SUI. Please try using the faucet manually at https://docs.sui.io/guides/developer/getting-sui');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'RATE_LIMITED') {
+        const address = currentAccount?.address || 'YOUR_ADDRESS';
+        alert(`⚠️ Faucet rate limited! Get testnet SUI manually:
+
+📱 Discord Method (Fastest):
+1. Join: https://discord.gg/sui
+2. Go to #testnet-faucet channel  
+3. Type: !faucet ${address}
+
+🌐 Web Method:
+Visit: https://docs.sui.io/guides/developer/getting-sui
+
+Your address: ${address}`);
+      } else {
+        console.error('❌ Failed to request testnet SUI:', error);
+        alert('❌ Error requesting testnet SUI. Please try again or use manual faucet.');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-8">
       <div className="max-w-6xl mx-auto">
@@ -72,13 +133,31 @@ const MarketplaceDashboard: React.FC = () => {
             <h1 className="text-3xl font-bold mb-2">NFT Marketplace</h1>
             <p className="text-gray-400">Discover and trade unique digital assets</p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="glass-button p-3 rounded-lg hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRequestTestnetSui}
+              disabled={loading}
+              className="glass-button p-3 rounded-lg hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
+              title="Request testnet SUI tokens"
+            >
+              <Coins className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
+            </button>
+            <button
+              onClick={handleTestTransaction}
+              disabled={testLoading}
+              className="glass-button p-3 rounded-lg hover:bg-green-500/20 transition-colors disabled:opacity-50"
+              title="Test transaction system"
+            >
+              <TestTube className={`w-5 h-5 ${testLoading ? 'animate-pulse' : ''}`} />
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="glass-button p-3 rounded-lg hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Stats */}

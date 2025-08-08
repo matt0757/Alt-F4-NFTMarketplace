@@ -135,8 +135,11 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
       // Wait longer for the transaction to be processed
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Only refresh user NFTs after successful mint
-      await refreshUserNFTs();
+      // COMMENTED OUT: This refresh was overwriting the newly created NFT
+      // because the blockchain indexer hasn't caught up yet
+      // await refreshUserNFTs();
+      
+      console.log('✅ NFT minting completed! NFT should be visible in your collection.');
       
     } catch (err) {
       console.error('❌ Mint error:', err);
