@@ -15,6 +15,7 @@ interface MarketplaceListing {
 interface MarketplaceContextType {
   listings: MarketplaceListing[];
   userNFTs: NFTObject[];
+  userListedNFTs: NFTObject[];
   loading: boolean;
   error: string | null;
   refreshListings: () => Promise<void>;
@@ -29,6 +30,7 @@ const MarketplaceContext = createContext<MarketplaceContextType | undefined>(und
 export function MarketplaceProvider({ children }: { children: ReactNode }) {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [userNFTs, setUserNFTs] = useState<NFTObject[]>([]);
+  const [userListedNFTs, setUserListedNFTs] = useState<NFTObject[]>([]); // Track NFTs you've listed
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
@@ -89,28 +91,77 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
     
     try {
       setLoading(true);
+      
+      // Create a wrapper function that properly handles the signAndExecute mutation
+      const wrappedExecute = async (tx: any) => {
+        return new Promise((resolve, reject) => {
+          signAndExecute(
+            { transaction: tx },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            }
+          );
+        });
+      };
+      
       await marketplaceService.listItem(
         currentAccount.address,
         itemId,
         price,
-        signAndExecute
+        wrappedExecute
       );
-      // Only refresh after successful transaction
-      await Promise.all([refreshListings(), refreshUserNFTs()]);
+      
+      // Instead of trying to keep it in userNFTs (since we don't own it anymore),
+      // move it to userListedNFTs and remove from userNFTs
+      console.log('✅ NFT listed successfully! Moving to listed NFTs...');
+      console.log('📋 Current userNFTs before update:', userNFTs);
+      
+      // Find the NFT being listed
+      const listedNFT = userNFTs.find(nft => nft.objectId === itemId);
+      if (listedNFT) {
+        // Remove from userNFTs (since we don't own it anymore)
+        setUserNFTs(prev => prev.filter(nft => nft.objectId !== itemId));
+        
+        // Add to userListedNFTs with price info
+        setUserListedNFTs(prev => [...prev, { ...listedNFT, isListed: true, price: price }]);
+        
+        console.log('✅ NFT moved to listed NFTs');
+      }
+      
+      // TEMPORARILY DISABLED: Refresh listings to show it in the marketplace
+      // await refreshListings();
+      console.log('⚠️ Listings refresh disabled for debugging');
+      
+      console.log('✅ NFT listing completed!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to list item');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [currentAccount, signAndExecute, refreshListings, refreshUserNFTs]);
+  }, [currentAccount, signAndExecute, refreshListings]);
 
   const purchaseItem = useCallback(async (itemId: string, price: number) => {
     if (!currentAccount) throw new Error('No account connected');
     
     try {
       setLoading(true);
-      await marketplaceService.purchaseItem(itemId, price, signAndExecute);
+      
+      // Create a wrapper function that properly handles the signAndExecute mutation
+      const wrappedExecute = async (tx: any) => {
+        return new Promise((resolve, reject) => {
+          signAndExecute(
+            { transaction: tx },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            }
+          );
+        });
+      };
+      
+      await marketplaceService.purchaseItem(itemId, price, wrappedExecute);
       // Only refresh after successful transaction
       await Promise.all([refreshListings(), refreshUserNFTs()]);
     } catch (err) {
@@ -129,8 +180,49 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       
-      const result = await marketplaceService.mintNFT(name, description, imageUrl, signAndExecute);
+      // Create a wrapper function that properly handles the signAndExecute mutation
+      const wrappedExecute = async (tx: any) => {
+        return new Promise((resolve, reject) => {
+          signAndExecute(
+            { transaction: tx },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            }
+          );
+        });
+      };
+      
+      const result = await marketplaceService.mintNFT(name, description, imageUrl, wrappedExecute);
       console.log('✅ Mint result:', result);
+      
+      // If we have a transaction digest, get the NFT directly
+      if (result?.digest) {
+        console.log('🔍 Transaction successful with digest:', result.digest);
+        
+        // Try to get the created NFT directly from transaction
+        console.log('🎯 Attempting to get NFT from transaction...');
+        const newNFT = await marketplaceService.getNFTFromTransaction(result.digest);
+        console.log('✅ Found NFT from transaction:', newNFT);
+        
+        if (newNFT?.objectId) {
+          // Add it to the local state immediately
+          setUserNFTs(prev => [...prev, newNFT]);
+          console.log('✅ NFT added to local state!');
+          
+          // Try to fetch the full object data directly for better info
+          console.log('🔍 Fetching full NFT data directly...');
+          const fullNFT = await marketplaceService.getNFTByObjectId(newNFT.objectId);
+          
+          if (fullNFT) {
+            console.log('✅ Got full NFT data:', fullNFT);
+            // Update with full data
+            setUserNFTs(prev => prev.map(nft => 
+              nft.objectId === fullNFT.objectId ? fullNFT : nft
+            ));
+          }
+        }
+      }
       
       // Wait longer for the transaction to be processed
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -176,6 +268,7 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
     <MarketplaceContext.Provider value={{
       listings,
       userNFTs,
+      userListedNFTs,
       loading,
       error,
       refreshListings,

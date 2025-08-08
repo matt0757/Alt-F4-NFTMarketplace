@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Coins } from 'lucide-react';
+import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Coins, Copy, Settings } from 'lucide-react';
 import CreateNFTModal from './CreateNFTModal';
 import ListNFTModal from './ListNFTModal';
 import { MarketplaceService } from '../services/marketplaceService';
@@ -11,6 +11,7 @@ const MarketplaceDashboard: React.FC = () => {
   const { 
     listings, 
     userNFTs, 
+    userListedNFTs,
     loading, 
     error, 
     refreshListings, 
@@ -124,6 +125,35 @@ Your address: ${address}`);
     }
   };
 
+  const copyAddressToClipboard = () => {
+    if (currentAccount?.address) {
+      navigator.clipboard.writeText(currentAccount.address);
+      alert(`✅ Wallet address copied to clipboard!\n\n${currentAccount.address}\n\nUse this address for Discord faucet: !faucet ${currentAccount.address}`);
+    }
+  };
+
+  const showWalletManagementGuide = () => {
+    const address = currentAccount?.address || 'YOUR_ADDRESS';
+    alert(`🛠️ Wallet Management Guide for Infinite Testnet SUI
+
+Your current address: ${address}
+
+📚 Steps to bypass faucet limits:
+
+1️⃣ Open terminal in your project folder
+2️⃣ Run: faucet-bypass.bat (Windows helper script)
+   OR use: node wallet-manager.js
+
+3️⃣ Create new wallet addresses when rate limited
+4️⃣ Request SUI for new addresses via Discord:
+   - Join: https://discord.gg/sui
+   - Type: !faucet [new_address]
+
+5️⃣ Transfer SUI back to main wallet
+
+💡 Pro tip: Keep 2-3 backup wallets ready!`);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-8">
       <div className="max-w-6xl mx-auto">
@@ -135,12 +165,26 @@ Your address: ${address}`);
           </div>
           <div className="flex gap-2">
             <button
+              onClick={copyAddressToClipboard}
+              className="glass-button p-3 rounded-lg hover:bg-blue-500/20 transition-colors"
+              title="Copy wallet address for faucet"
+            >
+              <Copy className="w-5 h-5" />
+            </button>
+            <button
               onClick={handleRequestTestnetSui}
               disabled={loading}
               className="glass-button p-3 rounded-lg hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
               title="Request testnet SUI tokens"
             >
               <Coins className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
+            </button>
+            <button
+              onClick={showWalletManagementGuide}
+              className="glass-button p-3 rounded-lg hover:bg-purple-500/20 transition-colors"
+              title="Wallet management guide for unlimited SUI"
+            >
+              <Settings className="w-5 h-5" />
             </button>
             <button
               onClick={handleTestTransaction}
@@ -177,7 +221,7 @@ Your address: ${address}`);
               <User className="w-8 h-8 text-green-500 mr-3" />
               <div>
                 <p className="text-2xl font-bold">{userNFTs.length}</p>
-                <p className="text-gray-400">Your NFTs</p>
+                <p className="text-gray-400">Owned NFTs</p>
               </div>
             </div>
           </div>
@@ -186,10 +230,8 @@ Your address: ${address}`);
             <div className="flex items-center">
               <Tag className="w-8 h-8 text-purple-500 mr-3" />
               <div>
-                <p className="text-2xl font-bold">
-                  {userNFTs.filter(nft => nft.isListed).length}
-                </p>
-                <p className="text-gray-400">Your Listed NFTs</p>
+                <p className="text-2xl font-bold">{userListedNFTs.length}</p>
+                <p className="text-gray-400">Listed for Sale</p>
               </div>
             </div>
           </div>
@@ -217,7 +259,7 @@ Your address: ${address}`);
             }`}
           >
             <User className="w-4 h-4 inline mr-2" />
-            My NFTs ({userNFTs.length})
+            My NFTs ({userNFTs.length + userListedNFTs.length})
           </button>
         </div>
 
@@ -323,9 +365,122 @@ Your address: ${address}`);
 
         {activeTab === 'my-nfts' && (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Your NFT Collection</h2>
+            <h2 className="text-xl font-semibold mb-6">Your NFT Collection</h2>
             
-            {userNFTs.length === 0 && !loading ? (
+            {/* Owned NFTs Section */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium mb-4 text-blue-400">
+                <Package className="w-5 h-5 inline mr-2" />
+                Owned NFTs ({userNFTs.length})
+              </h3>
+              
+              {userNFTs.length === 0 ? (
+                <div className="text-center py-8 glass rounded-xl">
+                  <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No owned NFTs</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userNFTs.map((nft) => (
+                    <div key={nft.objectId} className="glass rounded-xl overflow-hidden">
+                      <div className="h-48 bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
+                        {nft.imageUrl ? (
+                          <img 
+                            src={nft.imageUrl} 
+                            alt={nft.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="w-12 h-12 text-gray-400" />
+                        )}
+                      </div>
+                      
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold mb-2">{nft.name}</h3>
+                        <p className="text-gray-400 text-sm mb-4">{nft.description}</p>
+                        
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Token ID</p>
+                            <p className="text-sm font-mono">{nft.objectId.slice(0, 8)}...</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-green-400">✓ Owned</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleListNFT(nft)}
+                          className="w-full glass-button hover:bg-purple-500/20 transition-colors py-2 px-4 rounded-lg flex items-center justify-center"
+                        >
+                          <Tag className="w-4 h-4 mr-2" />
+                          List for Sale
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Listed NFTs Section */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium mb-4 text-purple-400">
+                <Tag className="w-5 h-5 inline mr-2" />
+                Listed for Sale ({userListedNFTs.length})
+              </h3>
+              
+              {userListedNFTs.length === 0 ? (
+                <div className="text-center py-8 glass rounded-xl">
+                  <Tag className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No NFTs listed for sale</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userListedNFTs.map((nft) => (
+                    <div key={nft.objectId} className="glass rounded-xl overflow-hidden border border-purple-500/30">
+                      <div className="h-48 bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                        {nft.imageUrl ? (
+                          <img 
+                            src={nft.imageUrl} 
+                            alt={nft.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="w-12 h-12 text-gray-400" />
+                        )}
+                      </div>
+                      
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold mb-2">{nft.name}</h3>
+                        <p className="text-gray-400 text-sm mb-4">{nft.description}</p>
+                        
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Token ID</p>
+                            <p className="text-sm font-mono">{nft.objectId.slice(0, 8)}...</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-400">Listed for</p>
+                            <p className="text-sm font-bold text-purple-400">{nft.price} SUI</p>
+                          </div>
+                        </div>
+
+                        <button 
+                          disabled 
+                          className="w-full bg-purple-600/20 text-purple-400 py-2 px-4 rounded-lg cursor-not-allowed border border-purple-500/30"
+                        >
+                          Listed on Marketplace
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Empty state when no NFTs at all */}
+            {userNFTs.length === 0 && userListedNFTs.length === 0 && !loading && (
               <div className="text-center py-16">
                 <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No NFTs yet</h3>
@@ -337,59 +492,6 @@ Your address: ${address}`);
                   <Plus className="w-4 h-4 mr-2 inline" />
                   Create NFT
                 </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {userNFTs.map((nft) => (
-                  <div key={nft.objectId} className="glass rounded-xl overflow-hidden">
-                    <div className="h-48 bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
-                      {nft.imageUrl ? (
-                        <img 
-                          src={nft.imageUrl} 
-                          alt={nft.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="w-12 h-12 text-gray-400" />
-                      )}
-                    </div>
-                    
-                    <div className="p-6">
-                      <h3 className="text-lg font-semibold mb-2">{nft.name}</h3>
-                      <p className="text-gray-400 text-sm mb-4">{nft.description}</p>
-                      
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <p className="text-sm text-gray-400">Token ID</p>
-                          <p className="text-sm font-mono">{nft.objectId.slice(0, 8)}...</p>
-                        </div>
-                        {nft.isListed && (
-                          <div className="text-right">
-                            <p className="text-sm text-gray-400">Listed for</p>
-                            <p className="text-sm font-bold text-green-400">{nft.price} SUI</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {nft.isListed ? (
-                        <button 
-                          disabled 
-                          className="w-full bg-green-600/20 text-green-400 py-2 px-4 rounded-lg cursor-not-allowed border border-green-500/30"
-                        >
-                          Listed for Sale
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleListNFT(nft)}
-                          className="w-full glass-button hover:bg-purple-500/20 transition-colors py-2 px-4 rounded-lg flex items-center justify-center"
-                        >
-                          <Tag className="w-4 h-4 mr-2" />
-                          List for Sale
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </div>
