@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Copy, Settings } from 'lucide-react';
+import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Copy } from 'lucide-react';
 import CreateNFTModal from './CreateNFTModal';
 import ListNFTModal from './ListNFTModal';
 import { MarketplaceService } from '../services/marketplaceService';
@@ -98,30 +98,8 @@ const MarketplaceDashboard: React.FC = () => {
   const copyAddressToClipboard = () => {
     if (currentAccount?.address) {
       navigator.clipboard.writeText(currentAccount.address);
-      alert(`✅ Wallet address copied to clipboard!\n\n${currentAccount.address}\n\nUse this address for Discord faucet: !faucet ${currentAccount.address}`);
+      alert(`✅ Wallet address copied to clipboard!\n\n${currentAccount.address}`);
     }
-  };
-
-  const showWalletManagementGuide = () => {
-    const address = currentAccount?.address || 'YOUR_ADDRESS';
-    alert(`🛠️ Wallet Management Guide for Infinite Testnet SUI
-
-Your current address: ${address}
-
-📚 Steps to bypass faucet limits:
-
-1️⃣ Open terminal in your project folder
-2️⃣ Run: faucet-bypass.bat (Windows helper script)
-   OR use: node wallet-manager.js
-
-3️⃣ Create new wallet addresses when rate limited
-4️⃣ Request SUI for new addresses via Discord:
-   - Join: https://discord.gg/sui
-   - Type: !faucet [new_address]
-
-5️⃣ Transfer SUI back to main wallet
-
-💡 Pro tip: Keep 2-3 backup wallets ready!`);
   };
 
   return (
@@ -137,16 +115,9 @@ Your current address: ${address}
             <button
               onClick={copyAddressToClipboard}
               className="glass-button p-3 rounded-lg hover:bg-blue-500/20 transition-colors"
-              title="Copy wallet address for faucet"
+              title="Copy wallet address"
             >
               <Copy className="w-5 h-5" />
-            </button>
-            <button
-              onClick={showWalletManagementGuide}
-              className="glass-button p-3 rounded-lg hover:bg-purple-500/20 transition-colors"
-              title="Wallet management guide for unlimited SUI"
-            >
-              <Settings className="w-5 h-5" />
             </button>
             <button
               onClick={handleTestTransaction}
