@@ -10,6 +10,7 @@ export interface NFTObject {
   owner: string;
   isListed?: boolean;
   price?: number;
+  isWrapped?: boolean;
 }
 
 export class MarketplaceService {
@@ -64,77 +65,132 @@ export class MarketplaceService {
     try {
       console.log('🔍 Fetching NFTs for user:', userAddress);
       
-      // Get all objects owned by the user
-      const ownedObjects = await this.client.getOwnedObjects({
-        owner: userAddress,
-        filter: {
-          StructType: `${MARKETPLACE_CONFIG.PACKAGE_ID}::nft::NFT`
-        },
-        options: {
-          showContent: true,
-          showDisplay: true,
-          showType: true,
-        }
-      });
-
-      console.log('📦 Raw owned objects:', ownedObjects);
-
+      const nfts: NFTObject[] = [];
+      
+      // Define both old and new contract IDs
+      const contractIds = [
+        MARKETPLACE_CONFIG.PACKAGE_ID, // New contract
+        "0xe4eb79c00345cf1d1ceb3b62d0513a2d3ef3099155d7469ef6b5ef56564c27e5" // Old contract
+      ];
+      
       // Get current marketplace listings to filter out listed items
       const currentListings = await this.getListings();
       const listedItemIds = new Set(currentListings.map(listing => listing.itemId));
       console.log('🏪 Currently listed items:', Array.from(listedItemIds));
-
-      const nfts: NFTObject[] = [];
-
-      for (const obj of ownedObjects.data) {
-        if (obj.data?.content && 'fields' in obj.data.content) {
-          const fields = obj.data.content.fields as any;
-          const objectId = obj.data.objectId;
-          
-          // Skip if this NFT is currently listed in the marketplace
-          if (listedItemIds.has(objectId)) {
-            console.log('⚠️ Skipping listed NFT:', objectId);
-            continue;
+      
+      // Check for NFTs from both contracts
+      for (const contractId of contractIds) {
+        console.log(`🔍 Checking contract: ${contractId}`);
+        
+        // Check for direct NFT objects
+        const nftObjects = await this.client.getOwnedObjects({
+          owner: userAddress,
+          filter: {
+            StructType: `${contractId}::nft::NFT`
+          },
+          options: {
+            showContent: true,
+            showDisplay: true,
+            showType: true,
           }
-          
-          // Try to extract NFT data from different possible field structures
-          const nft: NFTObject = {
-            objectId,
-            name: fields.name || fields.title || `NFT #${objectId.slice(0, 8)}`,
-            description: fields.description || fields.desc || 'No description',
-            imageUrl: fields.image_url || fields.imageUrl || fields.url || '',
-            owner: userAddress,
-          };
-          
-          nfts.push(nft);
-          console.log('✅ Parsed owned NFT:', nft);
-        }
-      }
+        });
 
-      // Also check for NFTs with display metadata
-      for (const obj of ownedObjects.data) {
-        if (obj.data?.display?.data) {
-          const display = obj.data.display.data;
-          const objectId = obj.data.objectId;
-          
-          // Skip if this NFT is currently listed in the marketplace
-          if (listedItemIds.has(objectId)) {
-            console.log('⚠️ Skipping listed NFT (display):', objectId);
-            continue;
+        console.log(`📦 Direct NFT objects from ${contractId}:`, nftObjects.data.length);
+
+        // Check for MarketplaceItem-wrapped NFTs
+        const marketplaceItems = await this.client.getOwnedObjects({
+          owner: userAddress,
+          filter: {
+            StructType: `${contractId}::marketplace::MarketplaceItem`
+          },
+          options: {
+            showContent: true,
+            showDisplay: true,
+            showType: true,
           }
-          
-          const nft: NFTObject = {
-            objectId,
-            name: display.name || `NFT #${objectId.slice(0, 8)}`,
-            description: display.description || 'No description',
-            imageUrl: display.image_url || display.link || '',
-            owner: userAddress,
-          };
-          
-          // Check if we already added this NFT
-          if (!nfts.find(n => n.objectId === nft.objectId)) {
+        });
+
+        console.log(`📦 MarketplaceItem objects from ${contractId}:`, marketplaceItems.data.length);
+
+        // Process direct NFTs
+        for (const obj of nftObjects.data) {
+          if (obj.data?.content && 'fields' in obj.data.content) {
+            const fields = obj.data.content.fields as any;
+            const objectId = obj.data.objectId;
+            
+            // Skip if this NFT is currently listed in the marketplace
+            if (listedItemIds.has(objectId)) {
+              console.log('⚠️ Skipping listed NFT:', objectId);
+              continue;
+            }
+            
+            const nft: NFTObject = {
+              objectId,
+              name: fields.name || fields.title || `NFT #${objectId.slice(0, 8)}`,
+              description: fields.description || fields.desc || 'No description',
+              imageUrl: fields.image_url || fields.imageUrl || fields.url || '',
+              owner: userAddress,
+            };
+            
             nfts.push(nft);
-            console.log('✅ Parsed owned NFT from display:', nft);
+            console.log('✅ Parsed direct NFT:', nft);
+          }
+        }
+
+        // Process MarketplaceItem-wrapped NFTs
+        for (const obj of marketplaceItems.data) {
+          if (obj.data?.content && 'fields' in obj.data.content) {
+            const fields = obj.data.content.fields as any;
+            const objectId = obj.data.objectId;
+            
+            // Skip if this MarketplaceItem is currently listed in the marketplace
+            if (listedItemIds.has(objectId)) {
+              console.log('⚠️ Skipping listed MarketplaceItem:', objectId);
+              continue;
+            }
+            
+            // Try to extract NFT data from the inner field
+            const innerNft = fields.inner;
+            if (innerNft && innerNft.fields) {
+              const nftFields = innerNft.fields;
+              const nft: NFTObject = {
+                objectId,
+                name: nftFields.name || `NFT #${objectId.slice(0, 8)}`,
+                description: nftFields.description || 'No description',
+                imageUrl: nftFields.image_url || nftFields.imageUrl || '',
+                owner: userAddress,
+                isWrapped: true, // Mark as wrapped so we know it's special
+              };
+              
+              nfts.push(nft);
+              console.log('✅ Parsed wrapped NFT from MarketplaceItem:', nft);
+            } else {
+              console.log('⚠️ MarketplaceItem missing inner NFT data:', fields);
+            }
+          }
+        }
+
+        // Also check for display metadata on both types
+        for (const obj of [...nftObjects.data, ...marketplaceItems.data]) {
+          if (obj.data?.display?.data) {
+            const display = obj.data.display.data;
+            const objectId = obj.data.objectId;
+            
+            // Skip if already processed or listed
+            if (listedItemIds.has(objectId) || nfts.find(n => n.objectId === objectId)) {
+              continue;
+            }
+            
+            const nft: NFTObject = {
+              objectId,
+              name: display.name || `NFT #${objectId.slice(0, 8)}`,
+              description: display.description || 'No description',
+              imageUrl: display.image_url || display.link || '',
+              owner: userAddress,
+            };
+            
+            nfts.push(nft);
+            console.log('✅ Parsed NFT from display metadata:', nft);
           }
         }
       }
@@ -153,6 +209,30 @@ export class MarketplaceService {
     price: number,
     signAndExecute: (tx: Transaction) => Promise<any>
   ) {
+    // Check if this is an NFT from the old contract
+    const oldContractId = "0xe4eb79c00345cf1d1ceb3b62d0513a2d3ef3099155d7469ef6b5ef56564c27e5";
+    
+    try {
+      // Try to get the object to check its type
+      const obj = await this.client.getObject({
+        id: itemObjectId,
+        options: { showType: true }
+      });
+      
+      const isOldContractNFT = obj.data?.type?.includes(oldContractId);
+      
+      if (isOldContractNFT) {
+        console.log('⚠️ Cannot list NFT from old contract. Please create a new NFT with the updated contract.');
+        throw new Error('This NFT is from an older version of the marketplace and cannot be listed. Please mint a new NFT to list for sale.');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('older version')) {
+        throw error;
+      }
+      // If we can't check the object, proceed with the listing attempt
+      console.log('⚠️ Could not verify NFT contract version, proceeding with listing attempt');
+    }
+
     const tx = new Transaction();
     
     // Use the new wrap_and_list_nft function that handles the MarketplaceItem wrapping

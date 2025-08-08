@@ -1,8 +1,8 @@
 // src/config/constants.ts
 export const MARKETPLACE_CONFIG = {
-  PACKAGE_ID: "0xe4eb79c00345cf1d1ceb3b62d0513a2d3ef3099155d7469ef6b5ef56564c27e5",
-  MARKETPLACE_ID: "0xcabbe41aaa5878a150ede77362655f3814f20ae9499a9d1bb2b88f0e255a4e9a", 
-  ADMIN_CAP_ID: "0xe9eb66ee1e6dba9a7d9779afafcd76e078b9180dea2d3df6db6fe9a5a50bb598",
+  PACKAGE_ID: "0x05fbfd41840cf36971756bc6831d8af3ec8fdbf40e1202989b32f61391bc89db",
+  MARKETPLACE_ID: "0xb3388dcfdf7d14faf94bec7b75e20d74dac9faf9bc81a4760f54582c8b2d93c4", 
+  ADMIN_CAP_ID: "0x7ad696f41f9fe8d10d6cc332f314daec47cf13fe1708549336173eaa1e9b1b50",
   NETWORK: "testnet" as const
 };
 
