@@ -24,7 +24,6 @@ interface MarketplaceContextType {
   purchaseItem: (itemId: string, price: number) => Promise<void>;
   mintNFT: (name: string, description: string, imageUrl: string) => Promise<void>;
   testTransaction: () => Promise<any>;
-  requestTestnetSui: () => Promise<boolean>;
 }
 
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined);
@@ -267,12 +266,6 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
     return await marketplaceService.testTransaction(wrappedExecute);
   }, [currentAccount, signAndExecute, marketplaceService]);
 
-  const requestTestnetSui = useCallback(async () => {
-    if (!currentAccount) throw new Error('No account connected');
-    
-    return await marketplaceService.requestTestnetSui(currentAccount.address);
-  }, [currentAccount, marketplaceService]);
-
   // Only refresh when account changes (not on every render)
   useEffect(() => {
     let mounted = true;
@@ -308,7 +301,6 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
       purchaseItem,
       mintNFT,
       testTransaction,
-      requestTestnetSui,
     }}>
       {children}
     </MarketplaceContext.Provider>

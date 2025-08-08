@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useMarketplace } from '../contexts/MarketplaceContext';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Coins, Copy, Settings } from 'lucide-react';
+import { ShoppingCart, Tag, Plus, Package, User, RefreshCw, TestTube, Copy, Settings } from 'lucide-react';
 import CreateNFTModal from './CreateNFTModal';
 import ListNFTModal from './ListNFTModal';
 import { MarketplaceService } from '../services/marketplaceService';
@@ -17,8 +17,7 @@ const MarketplaceDashboard: React.FC = () => {
     refreshListings, 
     refreshUserNFTs, 
     purchaseItem,
-    testTransaction,
-    requestTestnetSui
+    testTransaction
   } = useMarketplace();
   
   const currentAccount = useCurrentAccount();
@@ -96,35 +95,6 @@ const MarketplaceDashboard: React.FC = () => {
     }
   };
 
-  const handleRequestTestnetSui = async () => {
-    try {
-      const success = await requestTestnetSui();
-      if (success) {
-        alert('✅ Testnet SUI requested! Please wait a moment and try again.');
-      } else {
-        alert('❌ Failed to request testnet SUI. Please try using the faucet manually at https://docs.sui.io/guides/developer/getting-sui');
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMITED') {
-        const address = currentAccount?.address || 'YOUR_ADDRESS';
-        alert(`⚠️ Faucet rate limited! Get testnet SUI manually:
-
-📱 Discord Method (Fastest):
-1. Join: https://discord.gg/sui
-2. Go to #testnet-faucet channel  
-3. Type: !faucet ${address}
-
-🌐 Web Method:
-Visit: https://docs.sui.io/guides/developer/getting-sui
-
-Your address: ${address}`);
-      } else {
-        console.error('❌ Failed to request testnet SUI:', error);
-        alert('❌ Error requesting testnet SUI. Please try again or use manual faucet.');
-      }
-    }
-  };
-
   const copyAddressToClipboard = () => {
     if (currentAccount?.address) {
       navigator.clipboard.writeText(currentAccount.address);
@@ -170,14 +140,6 @@ Your current address: ${address}
               title="Copy wallet address for faucet"
             >
               <Copy className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleRequestTestnetSui}
-              disabled={loading}
-              className="glass-button p-3 rounded-lg hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
-              title="Request testnet SUI tokens"
-            >
-              <Coins className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
             </button>
             <button
               onClick={showWalletManagementGuide}

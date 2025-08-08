@@ -417,46 +417,6 @@ export class MarketplaceService {
     }
   }
 
-  // Request testnet SUI tokens for gas
-  async requestTestnetSui(userAddress: string): Promise<boolean> {
-    try {
-      console.log('💰 Requesting testnet SUI for:', userAddress);
-      
-      // Try the official faucet first
-      const response = await fetch('https://faucet.testnet.sui.io/gas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          FixedAmountRequest: {
-            recipient: userAddress
-          }
-        })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Testnet SUI requested successfully:', result);
-        // Wait a moment for the transaction to be processed
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        return true;
-      } else if (response.status === 429) {
-        console.warn('⚠️ Faucet rate limited. Please use manual faucet.');
-        throw new Error('RATE_LIMITED');
-      } else {
-        console.error('❌ Failed to request testnet SUI:', response.statusText);
-        return false;
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMITED') {
-        throw error;
-      }
-      console.error('❌ Error requesting testnet SUI:', error);
-      return false;
-    }
-  }
-
   // Test function to verify transaction system works
   async testTransaction(signAndExecute: (tx: Transaction) => Promise<any>) {
     try {
