@@ -172,8 +172,10 @@ export class MarketplaceService {
 
   async getListings() {
     try {
+      console.log('🔍 Fetching marketplace listings...');
+      
       // Query marketplace events to get listings
-      const events = await this.client.queryEvents({
+      const listingEvents = await this.client.queryEvents({
         query: {
           MoveEventType: `${MARKETPLACE_CONFIG.PACKAGE_ID}::marketplace::ItemListed`
         },
@@ -181,15 +183,103 @@ export class MarketplaceService {
         order: 'descending'
       });
 
-      return events.data.map(event => {
-        const parsed = event.parsedJson as any;
-        return {
-          itemId: parsed?.item_id || '',
-          seller: parsed?.seller || '',
-          price: Number(parsed?.price) || 0,
-          timestamp: event.timestampMs,
-        };
+      console.log('📦 Found listing events:', listingEvents.data.length);
+
+      // Also fetch mint events to correlate NFT metadata
+      const mintEvents = await this.client.queryEvents({
+        query: {
+          MoveEventType: `${MARKETPLACE_CONFIG.PACKAGE_ID}::nft::MintEvent`
+        },
+        limit: 100,
+        order: 'descending'
       });
+
+      console.log('🎨 Found mint events:', mintEvents.data.length);
+
+      // Create a map of object_id to NFT metadata from mint events
+      const nftMetadataMap = new Map();
+      mintEvents.data.forEach(event => {
+        const parsed = event.parsedJson as any;
+        if (parsed?.object_id) {
+          nftMetadataMap.set(parsed.object_id, {
+            name: parsed.name || 'Unknown NFT',
+            description: parsed.description || 'No description',
+            imageUrl: parsed.image_url || '',
+            creator: parsed.creator
+          });
+        }
+      });
+
+      console.log('🗺️ NFT metadata map:', nftMetadataMap);
+
+      // Enrich each listing with NFT details
+      const enrichedListings = await Promise.all(
+        listingEvents.data.map(async (event) => {
+          const parsed = event.parsedJson as any;
+          const itemId = parsed?.item_id || '';
+          
+          const basicListing = {
+            itemId,
+            seller: parsed?.seller || '',
+            price: Number(parsed?.price) || 0,
+            timestamp: event.timestampMs,
+          };
+
+          // First try to match with mint events
+          const metadata = nftMetadataMap.get(itemId);
+          if (metadata) {
+            console.log('✅ Found metadata from mint events for:', itemId);
+            return {
+              ...basicListing,
+              name: metadata.name,
+              description: metadata.description,
+              imageUrl: metadata.imageUrl,
+            };
+          }
+
+          // If no match in mint events, try to fetch the marketplace item directly
+          try {
+            console.log('🔍 Trying to fetch marketplace item directly:', itemId);
+            const marketplaceItem = await this.client.getObject({
+              id: itemId,
+              options: {
+                showContent: true,
+                showDisplay: true,
+                showType: true,
+              }
+            });
+
+            console.log('📦 Marketplace item result:', marketplaceItem);
+
+            // Check if this is a MarketplaceItem wrapper
+            if (marketplaceItem.data?.content && 'fields' in marketplaceItem.data.content) {
+              const fields = marketplaceItem.data.content.fields as any;
+              
+              // Look for the inner NFT object
+              if (fields.inner && fields.inner.fields) {
+                const nftFields = fields.inner.fields;
+                console.log('🎯 Found inner NFT fields:', nftFields);
+                
+                return {
+                  ...basicListing,
+                  name: nftFields.name || `NFT #${itemId.slice(0, 8)}`,
+                  description: nftFields.description || 'No description',
+                  imageUrl: nftFields.image_url || nftFields.imageUrl || '',
+                };
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ Could not fetch marketplace item:', itemId, error);
+          }
+
+          // Return basic listing as fallback
+          console.log('🔄 Using fallback data for:', itemId);
+          return basicListing;
+        })
+      );
+
+      console.log('🎯 Final enriched listings:', enrichedListings);
+      return enrichedListings;
     } catch (error) {
       console.error('❌ Error fetching listings:', error);
       return [];
