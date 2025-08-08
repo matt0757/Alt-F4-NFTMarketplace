@@ -27,6 +27,7 @@ const MarketplaceDashboard: React.FC = () => {
   const [showListModal, setShowListModal] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'my-nfts'>('marketplace');
+  const [showCopyToast, setShowCopyToast] = useState(false);
   
   // Use ref to track if initial load has happened
   const initialLoadRef = useRef(false);
@@ -72,7 +73,9 @@ const MarketplaceDashboard: React.FC = () => {
   const copyAddressToClipboard = () => {
     if (currentAccount?.address) {
       navigator.clipboard.writeText(currentAccount.address);
-      alert(`✅ Wallet address copied to clipboard!\n\n${currentAccount.address}`);
+      setShowCopyToast(true);
+      // Auto-hide after 2.5 seconds
+      setTimeout(() => setShowCopyToast(false), 2500);
     }
   };
 
@@ -418,6 +421,20 @@ const MarketplaceDashboard: React.FC = () => {
             }}
           />
         )}
+
+        {/* Copy Toast Notification */}
+        <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-500 ease-in-out ${
+          showCopyToast 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}>
+          <div className="glass px-6 py-3 rounded-lg border border-green-500/30 bg-green-500/10 shadow-lg">
+            <div className="flex items-center space-x-2 text-green-400">
+              <Copy className="w-4 h-4" />
+              <span className="font-medium">Address copied to clipboard!</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
