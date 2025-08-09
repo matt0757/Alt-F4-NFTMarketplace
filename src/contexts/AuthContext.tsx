@@ -83,6 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null);
       setCredentials([]);
       
+      // Clear localStorage (where Enoki might store session data)
+      localStorage.clear();
+      
+      // Clear sessionStorage as well
+      sessionStorage.clear();
+      
+      // Force page reload to ensure complete cleanup
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+      
       console.log('✅ User logged out successfully');
     } catch (err) {
       console.error('Logout failed:', err);
