@@ -316,6 +316,55 @@ export class MarketplaceService {
 
       console.log('📦 Found listing events:', listingEvents.data.length);
 
+      // Fetch sold events to filter out sold items
+      const soldEvents = await this.client.queryEvents({
+        query: {
+          MoveEventType: `${MARKETPLACE_CONFIG.PACKAGE_ID}::marketplace::ItemSold`
+        },
+        limit: 100,
+        order: 'descending'
+      });
+
+      console.log('💰 Found sold events:', soldEvents.data.length);
+
+      // Fetch cancelled events to filter out cancelled items
+      const cancelledEvents = await this.client.queryEvents({
+        query: {
+          MoveEventType: `${MARKETPLACE_CONFIG.PACKAGE_ID}::marketplace::ListingCancelled`
+        },
+        limit: 100,
+        order: 'descending'
+      });
+
+      console.log('❌ Found cancelled events:', cancelledEvents.data.length);
+
+      // Create a set of sold/cancelled item IDs
+      const soldItemIds = new Set();
+      soldEvents.data.forEach(event => {
+        const parsed = event.parsedJson as any;
+        if (parsed?.item_id) {
+          soldItemIds.add(parsed.item_id);
+        }
+      });
+
+      cancelledEvents.data.forEach(event => {
+        const parsed = event.parsedJson as any;
+        if (parsed?.item_id) {
+          soldItemIds.add(parsed.item_id);
+        }
+      });
+
+      console.log('🚫 Sold/cancelled item IDs:', soldItemIds);
+
+      // Filter out sold/cancelled listings
+      const activeListingEvents = listingEvents.data.filter(event => {
+        const parsed = event.parsedJson as any;
+        const itemId = parsed?.item_id || '';
+        return !soldItemIds.has(itemId);
+      });
+
+      console.log('✅ Active listing events:', activeListingEvents.length);
+
       // Also fetch mint events to correlate NFT metadata
       const mintEvents = await this.client.queryEvents({
         query: {
@@ -343,9 +392,9 @@ export class MarketplaceService {
 
       console.log('🗺️ NFT metadata map:', nftMetadataMap);
 
-      // Enrich each listing with NFT details
+      // Enrich each active listing with NFT details
       const enrichedListings = await Promise.all(
-        listingEvents.data.map(async (event) => {
+        activeListingEvents.map(async (event) => {
           const parsed = event.parsedJson as any;
           const itemId = parsed?.item_id || '';
           
