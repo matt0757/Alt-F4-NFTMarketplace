@@ -12,6 +12,7 @@ import { MarketplaceProvider } from './contexts/MarketplaceContext';
 import LoginScreen from './components/LoginScreen';
 import MarketplaceDashboard from './components/MarketplaceDashboard';
 import BackgroundAnimation from './components/BackgroundAnimation';
+import SessionTimeout from './components/SessionTimeout';
 import { RegisterEnokiWallets } from './components/RegisterEnokiWallets';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { SUI_CLIENT_CONFIG } from './config/constants';
@@ -25,7 +26,7 @@ const { networkConfig } = createNetworkConfig({
 });
 
 function AppContent() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isSessionValid } = useAuth();
   const currentAccount = useCurrentAccount();
 
   useEffect(() => {
@@ -34,19 +35,24 @@ function AppContent() {
     console.log('  - Loading:', loading);
     console.log('  - User exists?', !!user);
     console.log('  - Current account:', currentAccount?.address);
-  }, [user, loading, currentAccount]);
+    console.log('  - Session valid:', isSessionValid);
+  }, [user, loading, currentAccount, isSessionValid]);
 
   console.log('🎯 RENDER: Showing', user ? (currentAccount ? 'App' : 'Connecting wallet') : 'LoginScreen');
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Initializing...</p>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
+  // If session is invalid or no user, show login screen
+  if (!user || !isSessionValid) {
     return (
       <div className="min-h-screen bg-black text-white relative overflow-hidden">
         <BackgroundAnimation />
@@ -70,6 +76,7 @@ function AppContent() {
     <MarketplaceProvider>
       <div className="min-h-screen bg-black text-white relative overflow-hidden">
         <BackgroundAnimation />
+        <SessionTimeout />
         
         {/* Simple Top Navigation */}
         <nav className="relative z-10 p-4 border-b border-gray-800">
@@ -112,7 +119,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
         <RegisterEnokiWallets />
-        <WalletProvider autoConnect>
+        <WalletProvider>
           <AuthProvider>
             <AppContent />
           </AuthProvider>

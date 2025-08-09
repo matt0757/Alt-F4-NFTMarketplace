@@ -59,24 +59,24 @@ const LoginScreen: React.FC = () => {
           <div className="mt-8 pt-6 border-t border-gray-800">
             <h3 className="text-white font-semibold mb-4 flex items-center space-x-2">
               <Zap className="w-4 h-4 text-blue-400" />
-              <span>Zero-Knowledge Authentication</span>
+              <span>Secure Session Management</span>
             </h3>
             <ul className="space-y-3 text-gray-400 text-sm">
               <li className="flex items-start space-x-3">
                 <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                <span>Trade NFTs without revealing identity</span>
+                <span>Sessions expire after 24 hours for security</span>
+              </li>
+              <li className="flex items-start space-x-3">
+                <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                <span>Authentication required on browser restart</span>
+              </li>
+              <li className="flex items-start space-x-3">
+                <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                <span>Zero-knowledge cryptographic proofs</span>
               </li>
               <li className="flex items-start space-x-3">
                 <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                 <span>No wallet management or seed phrases</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                <span>Cryptographic proof of authentication</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <Lock className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                <span>Secure blockchain transactions</span>
               </li>
             </ul>
           </div>
