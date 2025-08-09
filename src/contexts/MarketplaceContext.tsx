@@ -166,16 +166,42 @@ export function MarketplaceProvider({ children }: { children: ReactNode }) {
         });
       };
       
+      // Find the item being purchased
+      const purchasedItem = listings.find(listing => listing.itemId === itemId);
+      
       await marketplaceService.purchaseItem(itemId, price, wrappedExecute);
-      // Only refresh after successful transaction
-      await Promise.all([refreshListings(), refreshUserNFTs()]);
+      
+      // Immediately update local state for better UX
+      if (purchasedItem) {
+        // Remove from listings immediately
+        setListings(prev => prev.filter(listing => listing.itemId !== itemId));
+        
+        // Add to user's NFTs immediately (without waiting for blockchain events)
+        const newNFT: NFTObject = {
+          objectId: itemId,
+          name: (purchasedItem as any).name || `NFT #${itemId.slice(0, 8)}`,
+          description: (purchasedItem as any).description || 'No description',
+          imageUrl: (purchasedItem as any).imageUrl || '',
+          owner: currentAccount.address,
+        };
+        
+        setUserNFTs(prev => [...prev, newNFT]);
+        console.log('✅ Purchase completed - local state updated immediately');
+      }
+      
+      // Still refresh to sync with blockchain state, but this happens in background
+      setTimeout(async () => {
+        await Promise.all([refreshListings(), refreshUserNFTs()]);
+        console.log('✅ Background refresh completed');
+      }, 2000);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to purchase item');
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [currentAccount, signAndExecute, refreshListings, refreshUserNFTs]);
+  }, [currentAccount, signAndExecute, refreshListings, refreshUserNFTs, listings]);
 
   const mintNFT = useCallback(async (name: string, description: string, imageUrl: string) => {
     if (!currentAccount) throw new Error('No account connected');
