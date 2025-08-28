@@ -9,6 +9,7 @@ export default {
       animation: {
         'pulse': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float linear infinite',
+        'fadeIn': 'fadeIn 0.5s ease-out forwards',
       },
       keyframes: {
         pulse: {
@@ -20,11 +21,30 @@ export default {
           },
         },
         float: {
-          from: {
-            transform: 'translateY(100vh) translateX(0)',
+          '0%': {
+            transform: 'translateY(100vh) translateX(0) rotate(0deg)',
           },
-          to: {
-            transform: 'translateY(-100vh) translateX(100px)',
+          '25%': {
+            transform: 'translateY(50vh) translateX(25px) rotate(90deg)',
+          },
+          '50%': {
+            transform: 'translateY(0vh) translateX(50px) rotate(180deg)',
+          },
+          '75%': {
+            transform: 'translateY(-50vh) translateX(75px) rotate(270deg)',
+          },
+          '100%': {
+            transform: 'translateY(-100vh) translateX(100px) rotate(360deg)',
+          },
+        },
+        fadeIn: {
+          '0%': {
+            opacity: '0',
+            transform: 'translateY(10px)',
+          },
+          '100%': {
+            opacity: '1',
+            transform: 'translateY(0)',
           },
         },
       },
